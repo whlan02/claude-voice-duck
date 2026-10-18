@@ -16,6 +16,13 @@ param(
     [string]$MicKey = 'AnthropicPBC.Claude_fnn82j28hfe8t'
 )
 
+# Single instance: if another copy is already running, exit quietly.
+$created = $false
+$mutex = New-Object System.Threading.Mutex($true, 'Local\claude-voice-duck', [ref]$created)
+if (-not $created) { return }
+# manage.ps1 -Stop signals this event so we can restore the volume before exiting.
+$stopEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::ManualReset, 'Local\claude-voice-duck-stop')
+
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -50,7 +57,7 @@ $ducked = $false
 $orig = 0.0
 
 try {
-    while ($true) {
+    while (-not $stopEvent.WaitOne(200)) {
         $recording = $false
         foreach ($path in $paths) {
             $p = Get-ItemProperty $path -ErrorAction SilentlyContinue
@@ -65,7 +72,6 @@ try {
             [Vol]::Set([float]$orig)
             $ducked = $false
         }
-        Start-Sleep -Milliseconds 200
     }
 } finally {
     if ($ducked) { [Vol]::Set([float]$orig) }

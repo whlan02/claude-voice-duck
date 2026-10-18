@@ -26,27 +26,35 @@ No install, no dependencies, no admin rights, no system settings or registry cha
 
 ### Usage
 
-Run it once (keep it in the background):
+Install it once (from PowerShell, in the repo folder):
 
 ```powershell
-powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File .\claude-voice-duck.ps1
+.\manage.ps1 install
 ```
 
-Options:
+This will:
+
+- start it now, with **no window** (it is launched through a tiny VBScript, so no console ever appears)
+- start it at every login, and **re-check every 5 minutes** via a scheduled task, so if you close it by accident it comes back on its own
+- put a **"Start Claude Voice Duck"** shortcut on your desktop for starting it by hand
+
+Running it more than once is always safe: only one copy can run at a time.
+
+Day to day:
 
 ```powershell
-# duck to 10% instead of the default 20%
-.\claude-voice-duck.ps1 -DuckPercent 10
+.\manage.ps1 status      # is it running? is auto-start on?
+.\manage.ps1 stop        # stop it (restores the volume) and pause auto-start
+.\manage.ps1 start       # start it again and turn auto-start back on
+.\manage.ps1 uninstall   # stop it and remove the task and shortcut
+.\manage.ps1 install -DuckPercent 10   # duck to 10% instead of the default 20%
 ```
 
-Start automatically at login (and remove it again):
+Use `stop` rather than ending the process in Task Manager: otherwise the 5-minute check will start it again.
 
-```powershell
-.\install-startup.ps1 -DuckPercent 20
-.\install-startup.ps1 -Uninstall
-```
+The scheduled task points at the folder the repo lives in. Keep it somewhere permanent; if you move it, run `.\manage.ps1 install` again. No admin rights needed.
 
-Stop it: end the `powershell.exe` process in Task Manager (or `Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ? CommandLine -match 'claude-voice-duck' | % { Stop-Process $_.ProcessId }`).
+To run the script by hand in a console instead: `.\claude-voice-duck.ps1 -DuckPercent 20`.
 
 ### Using it with other apps
 
@@ -58,7 +66,7 @@ classic `.exe` apps under `...\microphone\NonPackaged` (path separators are writ
 
 - It changes the **master** volume, so every sound drops, including Claude's own. It does not duck only the music player.
 - If you change the volume yourself while it's ducked, it will be reset to the pre-recording level afterwards.
-- If the script is force-killed while ducked, the volume stays low until you raise it.
+- If the script is force-killed (not stopped with `manage.ps1 stop`) while ducked, the volume stays low until you raise it.
 - If the Claude Desktop package name differs on your machine, use `-MicKey` as above.
 
 ### License
@@ -91,27 +99,35 @@ Windows 会在注册表（`CapabilityAccessManager\ConsentStore\microphone`）�
 
 ### 用法
 
-运行一次，让它留在后台：
+在仓库文件夹里用 PowerShell 安装一次：
 
 ```powershell
-powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File .\claude-voice-duck.ps1
+.\manage.ps1 install
 ```
 
-可选参数：
+它会：
+
+- 立刻启动，并且**没有任何窗口**（通过一个很小的 VBScript 启动，不会出现命令行窗口）
+- 每次登录自动启动，并通过计划任务**每 5 分钟检查一次**，所以即使你不小心关掉了，它也会自己回来
+- 在桌面放一个"**Start Claude Voice Duck**"快捷方式，想手动启动时双击即可
+
+重复启动是安全的：同一时间只会有一个在运行。
+
+日常使用：
 
 ```powershell
-# 降到 10%（默认 20%）
-.\claude-voice-duck.ps1 -DuckPercent 10
+.\manage.ps1 status      # 有没有在运行？自动启动开着吗？
+.\manage.ps1 stop        # 停止（会先恢复音量），并暂停自动启动
+.\manage.ps1 start       # 重新启动，并恢复自动启动
+.\manage.ps1 uninstall   # 停止，并删除计划任务和快捷方式
+.\manage.ps1 install -DuckPercent 10   # 降到 10%（默认 20%）
 ```
 
-开机自动运行（以及取消）：
+想关掉它请用 `stop`，不要在任务管理器里结束进程，否则 5 分钟后又会被自动拉起。
 
-```powershell
-.\install-startup.ps1 -DuckPercent 20
-.\install-startup.ps1 -Uninstall
-```
+计划任务指向仓库所在的文件夹，请把仓库放在固定位置；如果挪动了位置，重新运行一次 `.\manage.ps1 install`。不需要管理员权限。
 
-停止：在任务管理器里结束对应的 `powershell.exe` 进程即可。
+想在命令行里手动运行：`.\claude-voice-duck.ps1 -DuckPercent 20`。
 
 ### 用在别的程序上
 
@@ -123,7 +139,7 @@ powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File .\claude-voice-duck
 
 - 调的是**系统总音量**，所有声音都会变小，包括 Claude 自己的提示音，不能只压低音乐播放器。
 - 压低期间如果你自己调了音量，结束后会被重置回录音前的音量。
-- 如果脚本在压低期间被强制结束，音量会一直保持在低位，需要手动调回。
+- 如果脚本在压低期间被强制结束（而不是用 `manage.ps1 stop` 停止），音量会一直保持在低位，需要手动调回。
 - 如果你电脑上 Claude Desktop 的包名不同，请按上面的方法用 `-MicKey` 指定。
 
 ### 许可
