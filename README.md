@@ -1,147 +1,141 @@
 # claude-voice-duck
 
-[English](#english) | [中文](#中文)
+Automatically lowers your Windows system volume while **Claude Desktop** is recording voice input, and restores it when you stop. Made for people who work with music playing and don't want it picked up by dictation.
 
-## English
+- Starts ducking the moment you press record, not when you start talking, so pauses while you think don't let the music back in.
+- Runs invisibly in the background (no console window), starts at login, and restarts itself if you close it by accident.
+- Plain PowerShell. No dependencies, no admin rights.
 
-Automatically lowers your system volume while **Claude Desktop** is recording voice input, and restores it when you stop. Handy if you work with music playing and don't want it picked up by dictation.
+## Why this exists
 
-Apps like WeChat get this for free because Windows has a "reduce other sounds during communications" setting (`mmsys.cpl` → Communications tab), but it only triggers for apps that flag their microphone stream as "communications". Claude Desktop doesn't, so that setting has no effect. This script fills the gap.
+Apps like WeChat get this behavior for free: Windows has a "reduce other sounds during communications" setting (`mmsys.cpl` → Communications tab). But it only triggers for apps that flag their microphone stream as "communications" (WeChat, Teams, Zoom and similar). Claude Desktop doesn't, so that setting does nothing for it. This tool fills the gap.
 
-### How it works
+## How it works
 
-Windows records which apps are currently using the microphone in the registry (`CapabilityAccessManager\ConsentStore\microphone`). While an app holds the mic open, its `LastUsedTimeStop` value is `0`. The script polls that value every 200 ms:
+Windows records which apps are using the microphone under  
+`HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone`.  
+While an app holds the microphone open, its `LastUsedTimeStop` value is `0`. The script polls that value every 200 ms:
 
-- mic opened (you press the record button) → system volume is set to `DuckPercent`% of its current level
-- mic closed (you stop recording) → volume is restored
+- microphone opened (you press record) → system volume is set to `DuckPercent`% of its current level
+- microphone closed (you stop recording) → volume is restored to what it was
 
-It follows whether the microphone is **open**, not whether you are **speaking**, so pauses while you think don't let the music back in.
+The script only reads that registry key. It does not change any system settings or registry values.
 
-### Requirements
+## Requirements
 
-- Windows 10/11, Windows PowerShell 5.1 (built in)
-- Claude Desktop for Windows (Microsoft Store / MSIX version)
+- Windows 10 or 11 with the built-in Windows PowerShell 5.1
+- Claude Desktop for Windows, Microsoft Store / MSIX version (package `AnthropicPBC.Claude_fnn82j28hfe8t`). For another build or app, see [Using it with other apps](#using-it-with-other-apps).
 
-No install, no dependencies, no admin rights, no system settings or registry changes (it only reads one registry key).
+## Quick start
 
-### Usage
-
-Install it once (from PowerShell, in the repo folder):
-
-```powershell
-.\manage.ps1 install
-```
-
-This will:
-
-- start it now, with **no window** (it is launched through a tiny VBScript, so no console ever appears)
-- start it at every login, and **re-check every 5 minutes** via a scheduled task, so if you close it by accident it comes back on its own
-- put a **"Start Claude Voice Duck"** shortcut on your desktop for starting it by hand
-
-Running it more than once is always safe: only one copy can run at a time.
-
-Day to day:
+Get the code somewhere **permanent** (the scheduled task will point at this folder):
 
 ```powershell
-.\manage.ps1 status      # is it running? is auto-start on?
-.\manage.ps1 stop        # stop it (restores the volume) and pause auto-start
-.\manage.ps1 start       # start it again and turn auto-start back on
-.\manage.ps1 uninstall   # stop it and remove the task and shortcut
-.\manage.ps1 install -DuckPercent 10   # duck to 10% instead of the default 20%
+git clone https://github.com/whlan02/claude-voice-duck.git D:\tools\claude-voice-duck
+cd D:\tools\claude-voice-duck
 ```
 
-Use `stop` rather than ending the process in Task Manager: otherwise the 5-minute check will start it again.
+Install:
 
-The scheduled task points at the folder the repo lives in. Keep it somewhere permanent; if you move it, run `.\manage.ps1 install` again. No admin rights needed.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\manage.ps1 install
+```
 
-To run the script by hand in a console instead: `.\claude-voice-duck.ps1 -DuckPercent 20`.
+That's it. Open Claude Desktop, play some music, press the voice-input button: the volume should drop immediately and come back when you stop.
 
-### Using it with other apps
+> If you downloaded a ZIP instead of cloning, run `Get-ChildItem -Recurse | Unblock-File` in the folder first, otherwise Windows may refuse to run the scripts.
 
-Pass the app's key name from the registry with `-MicKey`. Packaged apps are listed directly under  
-`HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone`,  
-classic `.exe` apps under `...\microphone\NonPackaged` (path separators are written as `#`, e.g. `C:#Program Files#App#app.exe`).
+`install` does four things:
 
-### Limitations
+1. Starts the script now, with **no window**. It is launched through `start-hidden.vbs` (window style 0), so no console ever appears.
+2. Creates a scheduled task `claude-voice-duck` that runs at every login **and every 5 minutes**. If the script is already running it does nothing; if it isn't (you closed it, it crashed), it starts it again.
+3. Puts a **Start Claude Voice Duck** shortcut on your desktop for starting it by hand.
+4. Removes any older start-up shortcut from earlier versions.
 
-- It changes the **master** volume, so every sound drops, including Claude's own. It does not duck only the music player.
-- If you change the volume yourself while it's ducked, it will be reset to the pre-recording level afterwards.
+Running `install` again is always safe, and so is starting the script any number of times: only one copy can run at a time.
+
+## Everyday use
+
+Run these from the repo folder. (`-ExecutionPolicy Bypass` is only needed if your PowerShell blocks local scripts; it is harmless otherwise.)
+
+| Command | What it does |
+| --- | --- |
+| `powershell -ExecutionPolicy Bypass -File .\manage.ps1 status` | Shows whether it is running and whether auto-start is on |
+| `... manage.ps1 stop` | Stops it (volume is restored first) **and pauses auto-start** |
+| `... manage.ps1 start` | Starts it and turns auto-start back on |
+| `... manage.ps1 install -DuckPercent 10` | Reinstalls with a different ducked volume (default 20) |
+| `... manage.ps1 uninstall` | Stops it and removes the scheduled task and the desktop shortcut |
+
+Don't want to type anything? Double-click the **Start Claude Voice Duck** shortcut on your desktop. It is safe to click when it is already running.
+
+### Stopping it
+
+Use `manage.ps1 stop`. It restores the volume and pauses the 5-minute check, so it stays off until you run `start`.
+
+If you instead end the process in Task Manager, the 5-minute check will start it again within 5 minutes. That is intentional: it is what brings it back after an accidental close.
+
+To find the process in Task Manager anyway:
+
+1. Press `Ctrl + Shift + Esc`.
+2. **Windows 11:** type `powershell` into the search box at the top. **Windows 10:** open the Details tab.
+3. The script shows up as **Windows PowerShell** (`powershell.exe`). If you have other PowerShell windows open, several entries may match: go to the **Details** tab, right-click a column header → *Select columns* → tick **Command line**, and pick the one containing `claude-voice-duck.ps1`.
+
+If you end it while the volume is ducked, the volume stays low until you raise it yourself (see [Limitations](#limitations)).
+
+## Options
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `-DuckPercent` | `20` | Volume while recording, as a percentage of the volume before recording started (0–100) |
+| `-MicKey` | `AnthropicPBC.Claude_fnn82j28hfe8t` | Which app's microphone usage to watch (see below) |
+
+Pass them to `manage.ps1 install`; they are saved into the scheduled task and the desktop shortcut. To run the script by hand in a console instead (it stays in the foreground, Ctrl+C to stop):
+
+```powershell
+.\claude-voice-duck.ps1 -DuckPercent 20
+```
+
+## Using it with other apps
+
+`-MicKey` is the app's key name under  
+`HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone`  
+(Store/packaged apps), or under `...\microphone\NonPackaged` (classic `.exe` apps, where path separators are written as `#`, e.g. `C:#Program Files#App#app.exe`). The script checks both locations.
+
+To find the key: open the app, start recording in it, then list which key has `LastUsedTimeStop` = `0`:
+
+```powershell
+Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone' -Recurse |
+  ForEach-Object { $p = Get-ItemProperty $_.PSPath; if ($p.LastUsedTimeStop -eq 0) { $_.PSChildName } }
+```
+
+Then install with it: `manage.ps1 install -MicKey "<that name>"`.
+
+## Troubleshooting
+
+- **Nothing happens when I record.** Run `manage.ps1 status`. If it says *Running: NO*, run `manage.ps1 start`. If it is running, make sure you are recording in the Store version of Claude Desktop; if your build has a different package name, see the `-MicKey` section above.
+- **Volume is stuck low.** The script was force-killed while ducking. Raise the volume manually.
+- **It stopped working after I moved the folder.** The scheduled task and the desktop shortcut point at the folder you installed from. Run `manage.ps1 install` again from the new location.
+- **It keeps coming back after I close it.** That is the 5-minute check. Use `manage.ps1 stop` to pause it, or `uninstall` to remove it.
+- **"Running scripts is disabled on this system".** Use the `powershell -ExecutionPolicy Bypass -File ...` form shown above.
+
+## Limitations
+
+- It changes the **master** volume, so every sound drops, including Claude's own. It cannot duck only the music player.
+- If you change the volume yourself while it is ducked, it is reset to the pre-recording level when you stop recording.
 - If the script is force-killed (not stopped with `manage.ps1 stop`) while ducked, the volume stays low until you raise it.
-- If the Claude Desktop package name differs on your machine, use `-MicKey` as above.
+- There is no tray icon. Use `manage.ps1 status` to check on it.
+- After an accidental close, it can take up to 5 minutes to come back.
+- Windows only, and only for apps that appear in the Windows microphone usage list.
 
-### License
+## Files
 
-MIT
+| File | Purpose |
+| --- | --- |
+| `claude-voice-duck.ps1` | The script: watches the microphone state and ducks/restores the volume. Exits immediately if another copy is running. |
+| `start-hidden.vbs` | Starts the script with no window. Used by the scheduled task and the desktop shortcut. |
+| `manage.ps1` | `install`, `status`, `start`, `stop`, `uninstall`. |
+| `LICENSE` | MIT |
 
----
-
-## 中文
-
-**Claude Desktop** 开始语音输入（录音）时，自动压低系统音量，录音结束后恢复。适合边放音乐边工作，又不想音乐被语音输入录进去的人。
-
-微信有这个效果，是因为 Windows 有"通信时自动降低其他声音"的设置（`mmsys.cpl` → 通信选项卡），但它只对把麦克风标记为"通信"类型的程序生效。Claude Desktop 没有这样标记，所以这个设置对它没用。这个脚本就是补上这一块。
-
-### 原理
-
-Windows 会在注册表（`CapabilityAccessManager\ConsentStore\microphone`）里记录哪些程序正在用麦克风。程序占用麦克风期间，它的 `LastUsedTimeStop` 为 `0`。脚本每 200 毫秒检查一次：
-
-- 麦克风被打开（你点了录音）→ 系统音量降到当前音量的 `DuckPercent`%
-- 麦克风被关闭（你结束录音）→ 恢复原来的音量
-
-它判断的是麦克风**有没有打开**，而不是你**有没有在说话**，所以你停顿、思考的时候，音乐也不会回来。
-
-### 要求
-
-- Windows 10/11，自带的 Windows PowerShell 5.1
-- Windows 版 Claude Desktop（Microsoft Store / MSIX 版本）
-
-不用安装，没有依赖，不需要管理员权限，不修改系统设置和注册表（只读取一个注册表项）。
-
-### 用法
-
-在仓库文件夹里用 PowerShell 安装一次：
-
-```powershell
-.\manage.ps1 install
-```
-
-它会：
-
-- 立刻启动，并且**没有任何窗口**（通过一个很小的 VBScript 启动，不会出现命令行窗口）
-- 每次登录自动启动，并通过计划任务**每 5 分钟检查一次**，所以即使你不小心关掉了，它也会自己回来
-- 在桌面放一个"**Start Claude Voice Duck**"快捷方式，想手动启动时双击即可
-
-重复启动是安全的：同一时间只会有一个在运行。
-
-日常使用：
-
-```powershell
-.\manage.ps1 status      # 有没有在运行？自动启动开着吗？
-.\manage.ps1 stop        # 停止（会先恢复音量），并暂停自动启动
-.\manage.ps1 start       # 重新启动，并恢复自动启动
-.\manage.ps1 uninstall   # 停止，并删除计划任务和快捷方式
-.\manage.ps1 install -DuckPercent 10   # 降到 10%（默认 20%）
-```
-
-想关掉它请用 `stop`，不要在任务管理器里结束进程，否则 5 分钟后又会被自动拉起。
-
-计划任务指向仓库所在的文件夹，请把仓库放在固定位置；如果挪动了位置，重新运行一次 `.\manage.ps1 install`。不需要管理员权限。
-
-想在命令行里手动运行：`.\claude-voice-duck.ps1 -DuckPercent 20`。
-
-### 用在别的程序上
-
-用 `-MicKey` 传入该程序在注册表里的名字。商店版程序直接列在  
-`HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone` 下，  
-普通 `.exe` 程序在 `...\microphone\NonPackaged` 下（路径里的斜杠显示为 `#`，例如 `C:#Program Files#App#app.exe`）。
-
-### 局限
-
-- 调的是**系统总音量**，所有声音都会变小，包括 Claude 自己的提示音，不能只压低音乐播放器。
-- 压低期间如果你自己调了音量，结束后会被重置回录音前的音量。
-- 如果脚本在压低期间被强制结束（而不是用 `manage.ps1 stop` 停止），音量会一直保持在低位，需要手动调回。
-- 如果你电脑上 Claude Desktop 的包名不同，请按上面的方法用 `-MicKey` 指定。
-
-### 许可
+## License
 
 MIT
